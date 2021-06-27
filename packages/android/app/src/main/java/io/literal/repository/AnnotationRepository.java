@@ -16,7 +16,10 @@ import com.apollographql.apollo.exception.ApolloException;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 
@@ -118,12 +121,9 @@ public class AnnotationRepository {
                 });
     }
 
-    public static void createAnnotations(AWSAppSyncClient appSyncClient, Annotation[] annotations, Callback<ApolloException, List<CreateAnnotationMutation.Data>> callback) {
-        ManyCallback<ApolloException, CreateAnnotationMutation.Data> manyCallback = new ManyCallback<>(annotations.length, callback);
-
-        for (int i = 0; i < annotations.length; i++) {
-            Callback<ApolloException, CreateAnnotationMutation.Data> innerCallback = manyCallback.getCallback(i);
-            CreateAnnotationInput input = annotations[i].toCreateAnnotationInput();
+    public static CompletableFuture<List<CreateAnnotationMutation.Data>> createAnnotations(AWSAppSyncClient appSyncClient, Annotation[] annotations) {
+        List<CompletableFuture<CreateAnnotationMutation.Data>> results = Arrays.stream(annotations).map((annotation) -> {
+            CreateAnnotationInput input = annotation.toCreateAnnotationInput();
 
             try {
                 JSONObject properties = new JSONObject();
@@ -137,6 +137,7 @@ public class AnnotationRepository {
                 ErrorRepository.captureException(e);
             }
 
+            CompletableFuture<CreateAnnotationMutation.Data> future = new CompletableFuture<>();
             appSyncClient
                     .mutate(
                             CreateAnnotationMutation.builder()
@@ -148,16 +149,20 @@ public class AnnotationRepository {
                         public void onResponse(@Nonnull Response<CreateAnnotationMutation.Data> response) {
                             if (response.hasErrors()) {
                                 response.errors().forEach((error -> ErrorRepository.captureException(new Exception(error.message()))));
-                                innerCallback.invoke(new ApolloException("Server Error"), null);
+                                future.completeExceptionally((new ApolloException("Server Error")));
                             } else {
-                                innerCallback.invoke(null, response.data());
+                                future.complete(response.data());
                             }
                         }
                         @Override
                         public void onFailure(@Nonnull ApolloException e) {
-                            innerCallback.invoke(e, null);
+                            future.completeExceptionally(e);
                         }
                     });
-        }
+            return future;
+        }).collect(Collectors.toList());
+
+        return CompletableFuture.allOf(results.toArray(new CompletableFuture[0]))
+                .thenApply(_void -> results.stream().map((r) -> r.getNow(null)).collect(Collectors.toList()));
     }
 }

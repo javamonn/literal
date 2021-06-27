@@ -155,7 +155,9 @@ public class MainActivity extends InstrumentedActivity {
         appWebViewModelPrimary = new ViewModelProvider(this).get(APP_WEB_VIEW_PRIMARY_FRAGMENT_NAME, AppWebViewViewModel.class);
         appWebViewModelPrimary.getHasFinishedInitializing().observe(this, hasFinishedInitializing -> {
             ViewGroup splash = findViewById(R.id.splash);
-            splash.setVisibility(hasFinishedInitializing ? View.INVISIBLE : View.VISIBLE);
+            if (hasFinishedInitializing && splash.getVisibility() == View.VISIBLE) {
+                splash.setVisibility(View.INVISIBLE);
+            }
         });
         appWebViewModelPrimary.getReceivedWebEvents().observe(this,
                 (webEvents) -> {
@@ -177,21 +179,13 @@ public class MainActivity extends InstrumentedActivity {
                                 Annotation annotation = Annotation.fromJson(data.getJSONObject("annotation"));
                                 boolean displayBottomSheet = data.getBoolean("displayBottomSheet");
 
-                                sourceWebViewBottomSheetFragment.handleViewTargetForAnnotation(
-                                        annotation,
-                                        targetId,
-                                        (e, d) -> {
-                                            if (e != null) {
-                                                ErrorRepository.captureException(e);
-                                                return;
-                                            }
-
+                                sourceWebViewBottomSheetFragment.handleViewTargetForAnnotation(annotation, targetId)
+                                        .ifPresent((s) -> {
                                             if (displayBottomSheet) {
                                                 sourceWebViewBottomSheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
                                                 appWebViewViewModelBottomSheet.setBottomSheetState(BottomSheetBehavior.STATE_COLLAPSED);
                                             }
-                                        }
-                                );
+                                        });
                             } catch (JSONException e) {
                                 ErrorRepository.captureException(e, webEvent.toString());
                             }
@@ -263,8 +257,9 @@ public class MainActivity extends InstrumentedActivity {
             }
         }));
 
-        sourceWebViewBottomSheetFragment.setOnToolbarPrimaryActionCallback((_e, createdAnnotations, domainMetadata) -> {
+        sourceWebViewBottomSheetFragment.setOnToolbarPrimaryActionCallback((createdAnnotations, _source) -> {
             this.handleSourceWebViewBottomSheetHidden(createdAnnotations);
+            return null;
         });
         sourceWebViewBottomSheetFragment.setOnCreateAnnotationFromSource((_e, sourceUrl) -> {
             this.handleCreateAnnotationFromSource(sourceUrl.toString());

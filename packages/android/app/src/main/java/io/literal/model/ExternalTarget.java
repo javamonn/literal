@@ -66,8 +66,9 @@ public class ExternalTarget extends Target {
             }
         }
 
+        @NotNull
         public String toString() {
-            if (type.equals(Type.IRI)) {
+            if (type.equals(Type.IRI) && iri != null) {
                 return iri;
             }
             return storageObject.getCanonicalURI().toString();

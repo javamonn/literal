@@ -19,6 +19,7 @@ import io.literal.lib.Crypto;
 import io.literal.lib.JsonArrayUtil;
 import io.literal.lib.WebRoutes;
 import io.literal.repository.ErrorRepository;
+import kotlin.jvm.functions.Function1;
 import type.AnnotationType;
 import type.CreateAnnotationInput;
 
@@ -143,5 +144,86 @@ public class Annotation {
                 null,
                 annotationId
         );
+    }
+
+    public Annotation updateTarget(Target target) {
+        Function1<Target, String> getIDForTarget = (annotation) -> {
+            if (target instanceof ExternalTarget) {
+                return ((ExternalTarget) target).getId().toString();
+            } else if (target instanceof SpecificTarget) {
+                return ((SpecificTarget) target).getId();
+            } else {
+                return ((TextualTarget) target).getId();
+            }
+        };
+
+        Target[] newTarget = getTarget().clone();
+        for (int i = 0; i < getTarget().length; i++) {
+            if (getIDForTarget.invoke(getTarget()[i]).equals(getIDForTarget.invoke(target))) {
+                newTarget[i] = target;
+                break;
+            }
+        }
+
+        return new Annotation.Builder(this).setTarget(newTarget).build();
+    }
+
+    public static class Builder {
+        private Body[] body;
+        private Target[] target;
+        private Motivation[] motivation;
+        private String created;
+        private String modified;
+        private String id;
+
+        public Builder(Annotation base) {
+            this.body = base.getBody();
+            this.target = base.getTarget();
+            this.motivation = base.getMotivation();
+            this.created = base.getCreated();
+            this.id = base.getId();
+            this.modified = base.getModified();
+        }
+
+        public Builder setBody(Body[] body) {
+            this.body = body;
+            return this;
+        }
+
+        public Builder setTarget(Target[] target) {
+            this.target = target;
+            return this;
+        }
+
+        public Builder setMotivation(Motivation[] motivation) {
+            this.motivation = motivation;
+            return this;
+        }
+
+        public Builder setCreated(String created) {
+            this.created = created;
+            return this;
+        }
+
+        public Builder setModified(String modified) {
+            this.modified = modified;
+            return this;
+        }
+
+        public Builder setId(String id) {
+            this.id = id;
+            return this;
+        }
+
+        public Annotation build() {
+            return new Annotation(
+                    body,
+                    target,
+                    motivation,
+                    created,
+                    modified,
+                    id
+            );
+        }
     }
 }

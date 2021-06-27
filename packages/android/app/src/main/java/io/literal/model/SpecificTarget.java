@@ -1,9 +1,12 @@
 package io.literal.model;
 
+import com.amazonaws.services.s3.model.ObjectMetadata;
+
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -146,5 +149,45 @@ public class SpecificTarget extends Target {
                                 .build()
                 )
                 .build();
+    }
+
+    public static class Builder {
+        private String id;
+        private Target source;
+        private Selector[] selector;
+        private State[] state;
+
+        public Builder() {}
+        public Builder(SpecificTarget base) {
+            this.id = base.getId();
+            this.source = base.getSource();
+            this.selector = base.getSelector();
+            this.state = base.getState();
+        }
+
+        public Builder setId(String id) {
+            this.id = id;
+            return this;
+        }
+
+        public Builder setSource(Target source) {
+            this.source = source;
+            return this;
+        }
+
+        public Builder setSelector(Selector[] selector) {
+            this.selector = selector;
+            return this;
+        }
+
+        public Builder setState(State[] state) {
+            this.state = state;
+            return this;
+        }
+
+        public SpecificTarget build() {
+            Objects.requireNonNull(source);
+            return new SpecificTarget(id, source, selector, state);
+        }
     }
 }

@@ -11,6 +11,7 @@ const config = {
     GetAnnotationBoundingBox: resolvePath(
       "./get-annotation-bounding-box/index.mjs"
     ),
+    GetScripts: resolvePath("./get-scripts/index.mjs"),
   },
   output: {
     filename: "SourceWebView[name].js",

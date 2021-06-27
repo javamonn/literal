@@ -2,6 +2,9 @@ package io.literal.model;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.Bundle;
+import android.os.Parcel;
+import android.os.Parcelable;
 import android.util.Log;
 import android.util.Pair;
 import android.webkit.MimeTypeMap;
@@ -26,8 +29,11 @@ import java.net.URLEncoder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.text.Normalizer;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,8 +44,9 @@ import io.literal.lib.Callback3;
 import io.literal.lib.ContentResolverLib;
 import io.literal.repository.ErrorRepository;
 import io.literal.repository.StorageRepository;
+import kotlin.jvm.functions.Function3;
 
-public class StorageObject {
+public class StorageObject implements Parcelable {
     public enum Type {
         ARCHIVE,
         SCREENSHOT;
@@ -51,6 +58,12 @@ public class StorageObject {
         MEMORY_ONLY
     }
     public static final String CACHE_CONTROL = "public, max-age=604800, immutable";
+    public static String KEY_ID = "KEY_ID";
+    public static String KEY_TYPE = "KEY_TYPE";
+    public static String KEY_STATUS = "KEY_STATUS";
+    public static String KEY_FILE = "KEY_FILE";
+    public static String KEY_URI = "KEY_URI";
+    public static String KEY_CONTENT_TYPE = "KEY_CONTENT_TYPE";
 
     private static final Pattern ARCHIVES_PATH_PATTERN = Pattern.compile(".+/archives/(.+)");
     private static final Pattern SHARED_PUBLIC_READ_PATTERN = Pattern.compile("shared-public-read/onboarding/(.+)");
@@ -69,6 +82,48 @@ public class StorageObject {
         this.status = status;
         this.file = file;
         this.uri = uri;
+    }
+
+    protected StorageObject(Parcel in) {
+        Bundle input = new Bundle();
+        input.readFromParcel(in);
+
+        this.id = input.getString(KEY_ID);
+        this.type = (Type) input.getSerializable(KEY_TYPE);
+        this.status = (Status) input.getSerializable(KEY_STATUS);
+        this.file = new File(input.getString(KEY_FILE));
+        this.uri = new AmazonS3URI(input.getString(KEY_URI));
+        this.contentType = (Format) input.getSerializable(KEY_CONTENT_TYPE);
+
+    }
+
+    public static final Creator<StorageObject> CREATOR = new Creator<StorageObject>() {
+        @Override
+        public StorageObject createFromParcel(Parcel in) {
+            return new StorageObject(in);
+        }
+
+        @Override
+        public StorageObject[] newArray(int size) {
+            return new StorageObject[size];
+        }
+    };
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        Bundle output = new Bundle();
+        output.putString(KEY_ID, id);
+        output.putSerializable(KEY_TYPE, type);
+        output.putSerializable(KEY_STATUS, status);
+        output.putString(KEY_FILE, file.getAbsolutePath());
+        output.putString(KEY_URI, uri.toString());
+        output.putSerializable(KEY_CONTENT_TYPE, contentType);
+        output.writeToParcel(dest, flags);
     }
 
     public static StorageObject create(File file, Status status) {
@@ -279,7 +334,29 @@ public class StorageObject {
         return metadata;
     }
 
-    public TransferObserver upload(Context context, User user, Callback<Exception, AmazonS3URI> onUploadComplete, Callback3<Integer, Long, Long> onUploadProgress) {
+    public CompletableFuture<AmazonS3URI> upload(Context context, User user, Function3<Integer, Long, Long, Void> onUploadProgress) {
+        AmazonS3URI uri = getAmazonS3URI(context, user);
+        CompletableFuture<AmazonS3URI> future = new CompletableFuture<>();
+        StorageRepository.upload(
+                context,
+                uri.getKey(),
+                getFile(context),
+                getObjectMetadata(context),
+                (e, uri1) -> {
+                    if (e != null) {
+                        future.completeExceptionally(e);
+                    } else {
+                        future.complete(uri1);
+                    }
+                    return null;
+                },
+                onUploadProgress
+        );
+
+        return future;
+    }
+
+    public TransferObserver upload(Context context, User user, Callback<Exception, AmazonS3URI> onUploadComplete, Function3<Integer, Long, Long, Void> onUploadProgress) {
         AmazonS3URI uri = getAmazonS3URI(context, user);
         return StorageRepository.upload(
                 context,
@@ -291,19 +368,30 @@ public class StorageObject {
                         setStatus(Status.SYNCHRONIZED);
                     }
                     onUploadComplete.invoke(e, uri1);
+                    return null;
                 },
                 onUploadProgress
         );
     }
 
-    public ObjectMetadata download(Context context, User user) {
-        ObjectMetadata objectMetadata = null;
-        try {
-            objectMetadata = StorageRepository.getObject(context, getAmazonS3URI(context, user), getFile(context));
-            status = Status.SYNCHRONIZED;
-        } catch (Exception e) {
-            ErrorRepository.captureException(e);
+    public CompletableFuture<Void> download(Context context, User user) {
+        ensureDownloadRequired(context);
+        if (status.equals(Status.UPLOAD_REQUIRED) || status.equals(Status.SYNCHRONIZED)) {
+            return CompletableFuture.completedFuture(null);
         }
-        return objectMetadata;
+
+        if (status.equals(Status.MEMORY_ONLY)) {
+            CompletableFuture<Void> future = new CompletableFuture<>();
+            future.completeExceptionally(new Exception("Invalid state: unable to download StorageObject with status MEMORY_ONLY."));
+            return future;
+        }
+
+        AmazonS3URI uri = getAmazonS3URI(context, user);
+        return StorageRepository.download(context, uri.getKey(), getFile(context))
+                .whenComplete((_void, e) -> {
+                    if (e == null) {
+                        setStatus(Status.SYNCHRONIZED);
+                    }
+                });
     }
 }

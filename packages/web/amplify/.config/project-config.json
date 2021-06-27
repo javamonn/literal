@@ -2,7 +2,7 @@
   "providers": [
     "awscloudformation"
   ],
-  "projectName": "literal - production",
+  "projectName": "literal - staging",
   "version": "3.0",
   "frontend": "javascript",
   "javascript": {

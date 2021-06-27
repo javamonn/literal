@@ -11,6 +11,7 @@
     <string name="toast_create_from_source">Highlight text to annotate</string>
     <string name="toast_annotation_created">Annotation created</string>
     <string name="toast_annotations_created">Annotations created</string>
+    <string name="toast_error_annotation_created">Unable to capture annotation, try again.</string>
 
     <string name="annotation_created_notification_channel_id">ANNOTATION_CREATED</string>
     <string name="annotation_created_notification_channel_name">Annotation Created</string>
@@ -20,8 +21,11 @@
     <string name="source_created_notification_channel_id">SOURCE_CREATED</string>
     <string name="source_created_notification_channel_name">Source Created</string>
     <string name="source_created_notification_channel_description">Confirmation that a source has been created and annotated.</string>
+
     <string name="source_created_complete_notification_title">Source Created</string>
     <string name="source_created_complete_notification_description"><i>%1$s</i> added to library.</string>
+    <string name="source_created_complete_notification_description_default">A new source was added to your library.</string>
+
     <string name="source_created_start_notification_title">Creating Source</string>
     <string name="source_created_start_notification_description">Adding <i>%1$s</i> to library.</string>
     <string name="source_created_error_notification_title">Error Creating Source</string>

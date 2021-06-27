@@ -18,6 +18,7 @@ import org.json.JSONObject;
 import java.io.File;
 import java.net.URL;
 import java.util.Date;
+import java.util.concurrent.CompletableFuture;
 
 import io.literal.factory.AWSMobileClientFactory;
 import io.literal.factory.AmazonS3ClientFactory;
@@ -26,6 +27,8 @@ import io.literal.lib.AWSConfigurationLib;
 import io.literal.lib.Callback;
 import io.literal.lib.Callback3;
 import io.literal.model.User;
+import kotlin.jvm.functions.Function2;
+import kotlin.jvm.functions.Function3;
 
 public class StorageRepository {
 
@@ -74,8 +77,8 @@ public class StorageRepository {
             String key,
             File inputFile,
             ObjectMetadata metadata,
-            Callback<Exception, AmazonS3URI> onUploadComplete,
-            Callback3<Integer, Long, Long> onUploadProgress
+            Function2<Exception, AmazonS3URI, Void> onUploadComplete,
+            Function3<Integer, Long, Long, Void> onUploadProgress
     ) {
         TransferUtility transferUtility = AWSMobileClientFactory.getTransferUtility(context);
 
@@ -92,7 +95,7 @@ public class StorageRepository {
             @Override
             public void onProgressChanged(int id, long bytesCurrent, long bytesTotal) {
                 if (onUploadProgress != null) {
-                    onUploadProgress.invoke(null, id, bytesCurrent, bytesTotal);
+                    onUploadProgress.invoke(id, bytesCurrent, bytesTotal);
                 }
             }
 
@@ -105,16 +108,16 @@ public class StorageRepository {
         return transferObserver;
     }
 
-    public static void download(Context context, String key, File outputFile, Callback<Exception, File> onDownloadComplete) {
-        TransferObserver transferObserver = AWSMobileClientFactory.getTransferUtility(context)
-                .download(key, outputFile);
+    public static CompletableFuture<Void> download(Context context, String key, File outputFile) {
+        TransferObserver transferObserver = AWSMobileClientFactory.getTransferUtility(context).download(key, outputFile);
+        CompletableFuture<Void> future = new CompletableFuture<>();
         transferObserver.setTransferListener(new TransferListener() {
             @Override
             public void onStateChanged(int id, TransferState state) {
                 if (TransferState.COMPLETED != state) {
                     return;
                 }
-                onDownloadComplete.invoke(null, outputFile);
+                future.complete(null);
             }
 
             @Override
@@ -124,8 +127,9 @@ public class StorageRepository {
 
             @Override
             public void onError(int id, Exception ex) {
-                onDownloadComplete.invoke(ex, null);
+                future.completeExceptionally(ex);
             }
         });
+        return future;
     }
 }

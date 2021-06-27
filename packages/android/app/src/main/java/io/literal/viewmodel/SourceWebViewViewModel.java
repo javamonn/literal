@@ -1,20 +1,15 @@
 package io.literal.viewmodel;
 
-import android.content.res.AssetManager;
-import android.util.Log;
-
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import org.apache.commons.io.IOUtils;
-import org.json.JSONArray;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Optional;
 
 import io.literal.lib.AnnotationCollectionLib;
@@ -22,7 +17,6 @@ import io.literal.lib.AnnotationLib;
 import io.literal.lib.ArrayUtil;
 import io.literal.lib.Constants;
 import io.literal.lib.Crypto;
-import io.literal.lib.DomainMetadata;
 import io.literal.lib.WebEvent;
 import io.literal.lib.WebRoutes;
 import io.literal.model.Annotation;
@@ -34,103 +28,23 @@ import io.literal.model.Target;
 import io.literal.model.TextDirection;
 import io.literal.model.TextualBody;
 import io.literal.model.TextualTarget;
+import io.literal.model.WebArchive;
 import io.literal.repository.ErrorRepository;
+import io.literal.ui.view.SourceWebView.Source;
 
 public class SourceWebViewViewModel extends ViewModel {
-    private static final String GET_ANNOTATION_SCRIPT_NAME = "SourceWebViewGetAnnotation.js";
-    private static final String ANNOTATION_RENDERER_SCRIPT_NAME = "SourceWebViewAnnotationRenderer.js";
-    private static final String GET_ANNOTATION_BOUNDING_BOX_SCRIPT_NAME = "SourceWebViewGetAnnotationBoundingBox.js";
-    private final MutableLiveData<Boolean> hasFinishedInitializing = new MutableLiveData<>(false);
-    private final MutableLiveData<Boolean> hasInjectedAnnotationRendererScript = new MutableLiveData<>(false);
     private final MutableLiveData<ArrayList<Annotation>> annotations = new MutableLiveData<>(new ArrayList<>());
-    private ArrayList<String> createdAnnotationIds = new ArrayList<>();
-    private final MutableLiveData<DomainMetadata> domainMetadata = new MutableLiveData<>(null);
     private final MutableLiveData<String> focusedAnnotationId = new MutableLiveData<>(null);
     private final MutableLiveData<ArrayDeque<WebEvent>> webEvents = new MutableLiveData<>(null);
-    private String getAnnotationScript = null;
-    private String annotationRendererScript = null;
-    private String getAnnotationBoundingBoxScript = null;
-
-    public MutableLiveData<Boolean> getHasFinishedInitializing() {
-        return hasFinishedInitializing;
-    }
-
-    public void setHasFinishedInitializing(Boolean hasFinishedInitializing) {
-        this.hasFinishedInitializing.setValue(hasFinishedInitializing);
-    }
-
-    public MutableLiveData<Boolean> getHasInjectedAnnotationRendererScript() {
-        return hasInjectedAnnotationRendererScript;
-    }
-
-    public void setHasInjectedAnnotationRendererScript(boolean hasInjectedAnnotationRendererScript) {
-        this.hasInjectedAnnotationRendererScript.setValue(hasInjectedAnnotationRendererScript);
-    }
-
-    public String getGetAnnotationScript(AssetManager assetManager) {
-        if (getAnnotationScript == null) {
-            try {
-                getAnnotationScript =
-                        IOUtils.toString(assetManager.open(GET_ANNOTATION_SCRIPT_NAME), StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                ErrorRepository.captureException(e);
-            }
-        }
-        return getAnnotationScript;
-    }
-
-    public String getAnnotationRendererScript(AssetManager assetManager, JSONArray paramAnnotations, String paramFocusedAnnotationId) {
-        if (annotationRendererScript == null) {
-            try {
-                annotationRendererScript =
-                        IOUtils.toString(assetManager.open(ANNOTATION_RENDERER_SCRIPT_NAME), StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                ErrorRepository.captureException(e);
-            }
-        }
-
-        String stringifiedParamAnnotations = JSONObject.quote(paramAnnotations.toString());
-        String output = annotationRendererScript
-                .replaceAll(
-                        "process\\.env\\.PARAM_ANNOTATIONS",
-                        stringifiedParamAnnotations.substring(1, stringifiedParamAnnotations.length() - 1)
-                )
-                .replaceAll(
-                        "process\\.env\\.PARAM_FOCUSED_ANNOTATION_ID",
-                        JSONObject.quote(paramFocusedAnnotationId)
-                );
-        return output;
-    }
-
-    public String getGetAnnotationBoundingBoxScript(AssetManager assetManager, JSONObject paramAnnotation) {
-        if (getAnnotationBoundingBoxScript == null) {
-            try {
-                getAnnotationBoundingBoxScript = IOUtils.toString(assetManager.open(GET_ANNOTATION_BOUNDING_BOX_SCRIPT_NAME), StandardCharsets.UTF_8);
-            } catch (IOException e) {
-                ErrorRepository.captureException(e);
-            }
-        }
-        String stringifiedParamAnnotation = JSONObject.quote(paramAnnotation.toString());
-        return getAnnotationBoundingBoxScript
-                .replaceAll(
-                        "process\\.env\\.PARAM_ANNOTATION",
-                        stringifiedParamAnnotation.substring(1, stringifiedParamAnnotation.length() - 1)
-                );
-    }
+    private final MutableLiveData<Boolean> sourceHasFinishedInitializing = new MutableLiveData<>(false);
+    private final ArrayList<String> newAnnotationIds = new ArrayList<>();
+    private final HashMap<String, WebArchive> webArchives = new HashMap<>();
 
     public MutableLiveData<ArrayList<Annotation>> getAnnotations() {
         return annotations;
     }
     public void setAnnotations(ArrayList<Annotation> annotations) {
         this.annotations.setValue(annotations);
-    }
-
-    public MutableLiveData<DomainMetadata> getDomainMetadata() {
-        return domainMetadata;
-    }
-
-    public void setDomainMetadata(DomainMetadata domainMetadata) {
-        this.domainMetadata.setValue(domainMetadata);
     }
 
     public MutableLiveData<String> getFocusedAnnotationId() {
@@ -151,15 +65,36 @@ public class SourceWebViewViewModel extends ViewModel {
         focusedAnnotationId.setValue(annotationId);
     }
 
-    public ArrayList<String> getCreatedAnnotationIds() {
-        return createdAnnotationIds;
+    public ArrayList<String> getNewAnnotationIds() {
+        return newAnnotationIds;
     }
 
-    public void setCreatedAnnotationIds(ArrayList<String> createdAnnotationIds) {
-        this.createdAnnotationIds = createdAnnotationIds;
+    public void addWebArchive(String annotationId, WebArchive webArchive) {
+        this.webArchives.put(annotationId, webArchive);
     }
 
-    public Annotation createAnnotation(String json, String creatorUsername, boolean shouldAddAnnotation) {
+    public HashMap<String, WebArchive> getWebArchives() {
+        return webArchives;
+    }
+
+    public MutableLiveData<Boolean> getSourceHasFinishedInitializing() {
+        return sourceHasFinishedInitializing;
+    }
+
+    public void setSourceHasFinishedInitializing(boolean sourceHasFinishedInitializing) {
+        this.sourceHasFinishedInitializing.setValue(sourceHasFinishedInitializing);
+    }
+
+    public void reset() {
+        this.annotations.setValue(new ArrayList<>());
+        this.focusedAnnotationId.setValue(null);
+        this.webEvents.setValue(new ArrayDeque<>());
+        this.sourceHasFinishedInitializing.setValue(false);
+        this.newAnnotationIds.clear();
+        this.webArchives.clear();
+    }
+
+    public Annotation createAnnotation(String json, String creatorUsername) {
         try {
             ArrayList<Annotation> newAnnotations = (ArrayList<Annotation>) annotations.getValue().clone();
             Annotation annotation = Annotation.fromJson(new JSONObject(json));
@@ -225,11 +160,10 @@ public class SourceWebViewViewModel extends ViewModel {
 
             }
 
-            if (shouldAddAnnotation) {
-                newAnnotations.add(annotation);
-                annotations.setValue(newAnnotations);
-                createdAnnotationIds.add(annotation.getId());
-            }
+            newAnnotations.add(annotation);
+            annotations.setValue(newAnnotations);
+            newAnnotationIds.add(annotation.getId());
+
             return annotation;
         } catch (Exception e) {
             ErrorRepository.captureException(e);
@@ -241,7 +175,7 @@ public class SourceWebViewViewModel extends ViewModel {
         ArrayList<Annotation> newAnnotations = (ArrayList<Annotation>) annotations.getValue().clone();
         newAnnotations.add(annotation);
         annotations.setValue(newAnnotations);
-        createdAnnotationIds.add(annotation.getId());
+        newAnnotationIds.add(annotation.getId());
     }
 
     public void addAnnotation(Annotation annotation) {

@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentContainerView;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.amazonaws.amplify.generated.graphql.CreateAnnotationMutation;
 import com.amazonaws.amplify.generated.graphql.GetAnnotationQuery;
 import com.amazonaws.mobile.client.UserState;
 import com.amazonaws.mobileconnectors.appsync.ClearCacheException;
@@ -43,9 +44,11 @@ import io.literal.repository.ErrorRepository;
 import io.literal.repository.NotificationRepository;
 import io.literal.repository.ToastRepository;
 import io.literal.service.AnnotationService;
+import io.literal.service.CreateAnnotationIntent;
 import io.literal.ui.fragment.AppWebView;
 import io.literal.ui.fragment.AppWebViewBottomSheetAnimator;
 import io.literal.ui.fragment.SourceWebView;
+import io.literal.ui.view.SourceWebView.Source;
 import io.literal.viewmodel.AppWebViewViewModel;
 import io.literal.viewmodel.AuthenticationViewModel;
 import io.literal.viewmodel.SourceWebViewViewModel;
@@ -126,7 +129,8 @@ public class ShareTargetHandler extends InstrumentedActivity {
 
     private void installSourceWebView(String sourceWebViewUri, String appWebViewUri) {
         sourceWebViewViewModel = new ViewModelProvider(this).get(SourceWebViewViewModel.class);
-        sourceWebViewViewModel.getHasFinishedInitializing().observe(this, hasFinishedInitializing -> {
+
+        sourceWebViewViewModel.getSourceHasFinishedInitializing().observe(this, hasFinishedInitializing -> {
             ViewGroup splash = findViewById(R.id.share_target_handler_splash);
             splash.setVisibility(hasFinishedInitializing ? View.INVISIBLE : View.VISIBLE);
 
@@ -134,6 +138,7 @@ public class ShareTargetHandler extends InstrumentedActivity {
                 ToastRepository.show(this, R.string.toast_create_from_source);
             }
         });
+
 
         bottomSheetFragmentContainer = findViewById(R.id.bottom_sheet_fragment_container);
 
@@ -157,7 +162,10 @@ public class ShareTargetHandler extends InstrumentedActivity {
                 null,
                 R.drawable.done_white
         );
-        sourceWebViewFragment.setOnToolbarPrimaryActionCallback((_e, annotations, domainMetadata) -> this.handleCreateFromSourceDone(annotations, domainMetadata));
+        sourceWebViewFragment.setOnToolbarPrimaryActionCallback((annotations, source) -> {
+            this.handleCreateFromSourceDone(annotations);
+            return null;
+        });
 
         appWebViewFragment = AppWebView.newInstance(appWebViewUri, null);
         getSupportFragmentManager()
@@ -199,7 +207,7 @@ public class ShareTargetHandler extends InstrumentedActivity {
         installSourceWebView(sourceWebViewUri, appWebViewUri);
     }
 
-    private void handleCreateFromSourceDone(Annotation[] annotations, DomainMetadata domainMetadata) {
+    private void handleCreateFromSourceDone(Annotation[] annotations) {
         if (annotations != null && annotations.length > 0) {
             String resultAnnotationsJson = "";
             try {
@@ -243,12 +251,13 @@ public class ShareTargetHandler extends InstrumentedActivity {
             appWebViewViewModel.clearReceivedWebEvents();
         });
 
-        Intent serviceIntent = AnnotationService.getCreateAnnotationsIntent(
-                this,
-                new Annotation[]{annotation},
-                null
-        );
-        startService(serviceIntent);
+        (new CreateAnnotationIntent.Builder())
+                .setAnnotations(new Annotation[]{annotation})
+                .setId(UUID.randomUUID().toString())
+                .build()
+                .toIntent()
+                .ifPresent(this::startService);
+
     }
 
     private void handleCreateFromImage(Intent intent, User user) {
@@ -280,8 +289,12 @@ public class ShareTargetHandler extends InstrumentedActivity {
             appWebViewViewModel.clearReceivedWebEvents();
         });
 
-        Intent serviceIntent = AnnotationService.getCreateAnnotationsIntent(this, new Annotation[]{annotation}, null);
-        startService(serviceIntent);
+        (new CreateAnnotationIntent.Builder())
+                .setAnnotations(new Annotation[]{annotation})
+                .setId(UUID.randomUUID().toString())
+                .build()
+                .toIntent()
+                .ifPresent(this::startService);
     }
 
     private void displayAnnotationCreatedNotification(User user, Annotation annotation) {

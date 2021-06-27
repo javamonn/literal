@@ -28,7 +28,7 @@
                 app:titleMarginStart="32dp"/>
         </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
-    <io.literal.ui.view.SourceWebView
+    <io.literal.ui.view.SourceWebView.SourceWebView
         android:id="@+id/source_web_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
