@@ -4,15 +4,18 @@ import android.content.Context;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.util.Log;
 import android.webkit.WebResourceRequest;
 
 import androidx.annotation.NonNull;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.james.mime4j.Charsets;
 import org.apache.james.mime4j.dom.Entity;
 import org.apache.james.mime4j.dom.Message;
 import org.apache.james.mime4j.dom.Multipart;
 import org.apache.james.mime4j.dom.SingleBody;
+import org.apache.james.mime4j.dom.field.ContentLocationField;
 import org.apache.james.mime4j.message.BodyPart;
 import org.apache.james.mime4j.message.BodyPartBuilder;
 import org.apache.james.mime4j.message.DefaultMessageBuilder;
@@ -25,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -156,12 +160,12 @@ public class WebArchive implements Parcelable {
         bodyPartByContentLocation = bodyParts.stream().collect(
                 HashMap::new,
                 (agg, bodyPart) -> {
-                    Field contentLocation = bodyPart.getHeader().getField("Content-Location");
+                    ContentLocationField contentLocation = (ContentLocationField) bodyPart.getHeader().getField("Content-Location");
                     if (contentLocation == null) {
                         ErrorRepository.captureWarning(new Exception("Invalid state: unable to find content-location header in body part."));
                         return;
                     }
-                    agg.put(contentLocation.getBody(), (BodyPart) bodyPart);
+                    agg.put(contentLocation.getLocation(), (BodyPart) bodyPart);
                 },
                 HashMap::putAll
         );
@@ -181,6 +185,7 @@ public class WebArchive implements Parcelable {
                 .thenCompose(_file -> {
                     // For each web request not currently within the archive, execute it and build a BodyPart
 
+                    Log.i("compile", "original archive path: " + getStorageObject().getFile(context).getAbsolutePath());
                     HashMap<String, BodyPart> bodyPartByContentLocation = getBodyPartByContentLocation();
                     List<CompletableFuture<Optional<BodyPart>>> webRequestBodyPartFutures = getWebRequests()
                             .stream()
@@ -192,12 +197,10 @@ public class WebArchive implements Parcelable {
                             .collect(Collectors.toList());
 
                     return CompletableFuture.allOf(webRequestBodyPartFutures.toArray(new CompletableFuture[0]))
-                            .thenApply(_void -> {;
-                                return webRequestBodyPartFutures.stream()
-                                        .map((f) -> f.getNow(Optional.empty()).orElse(null))
-                                        .filter(f -> !Objects.isNull(f))
-                                        .collect(Collectors.toList());
-                            });
+                            .thenApply(_void -> webRequestBodyPartFutures.stream()
+                                    .map((f) -> f.getNow(Optional.empty()).orElse(null))
+                                    .filter(f -> !Objects.isNull(f))
+                                    .collect(Collectors.toList()));
                 })
                 .thenApply((bodyParts) -> {
                     // Add the constructed web request body parts into the mime message, and update the primary
@@ -236,6 +239,7 @@ public class WebArchive implements Parcelable {
         try {
             SingleBody body = (SingleBody) bodyPart.getBody();
             String html = IOUtils.toString(body.getInputStream(), StandardCharsets.UTF_8);
+            Log.i("add scripts to body part", html);
             int closeHeadElemIdx = html.indexOf("</body>");
             if (closeHeadElemIdx == -1) {
                 ErrorRepository.captureException(new Exception("Unable to locate index of head element within archive."));
@@ -252,7 +256,7 @@ public class WebArchive implements Parcelable {
             htmlStringBuilder.insert(closeHeadElemIdx, scriptsStringBuilder.toString());
 
             BodyPartBuilder bodyPartBuilder = BodyPartBuilder.create()
-                    .setBody(SingleBodyBuilder.createCopy(body).setText(htmlStringBuilder.toString()).build())
+                    .setBody(htmlStringBuilder.toString(), Charsets.UTF_8)
                     .setContentDisposition(bodyPart.getDispositionType())
                     .setContentTransferEncoding(bodyPart.getContentTransferEncoding())
                     .setContentType(bodyPart.getMimeType());

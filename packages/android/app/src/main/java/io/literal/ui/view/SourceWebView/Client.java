@@ -24,8 +24,11 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.PKIXRevocationChecker;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,17 +88,15 @@ public class Client extends WebViewClient {
             return null;
         }
 
-        Log.i("shouldInterceptRequest", "webResourceRequest: " + request.getUrl());
-
         onWebResourceRequest.invoke(request);
+
+        Log.i("shouldInterceptRequest", "intercepting: " + request.getUrl().toString());
 
         if (source.getType().equals(Source.Type.EXTERNAL_SOURCE) || !source.getWebArchive().isPresent()) {
             return null;
         }
 
-        Log.i("shouldInterceptRequest", "getting webarchive");
         WebArchive webArchive = source.getWebArchive().get();
-        Log.i("shouldInterceptRequest", "got webarchive");
         try {
             webArchive.open(context, user).get();
 
@@ -104,7 +105,7 @@ public class Client extends WebViewClient {
                         try {
                             WebResourceResponse webResourceResponse = new WebResourceResponse(
                                     bodyPart.getMimeType(),
-                                    bodyPart.getCharset(),
+                                    StandardCharsets.UTF_8.toString(),
                                     ((SingleBody) bodyPart.getBody()).getInputStream()
                             );
 
@@ -120,6 +121,8 @@ public class Client extends WebViewClient {
                     });
 
             if (!response.isPresent()) {
+                Log.i("shouldInterceptRequest", "content locations: " + Arrays.toString(webArchive.getBodyPartByContentLocation().keySet().toArray(new String[0])));
+
                 Sentry.pushScope();
                 Sentry.configureScope((scope) -> {
                     scope.setContexts("WebResourceRequest URL", request.getUrl());
@@ -158,7 +161,7 @@ public class Client extends WebViewClient {
         }
 
         if (source.getType().equals(Source.Type.WEB_ARCHIVE)) {
-            return source.getWebArchive().map(w -> w.getStorageObject().getAmazonS3URI(context, user).getURI());
+            return Optional.of(source.getDisplayURI());
         }
 
         return Optional.empty();

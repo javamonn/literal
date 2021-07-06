@@ -741,12 +741,27 @@ public class SourceWebView extends Fragment {
     public Optional<Source> handleViewTargetForAnnotation(Annotation annotation, String targetId) {
         Optional<Source> optionalSource = Source.createFromAnnotation(getContext(), annotation, targetId);
         optionalSource.ifPresent((source) -> {
-            boolean shouldLoadSource = webView.getSource().map(s -> !s.equals(source)).orElse(true);
+            boolean shouldLoadSource = webView.getSource().map(currentSource -> {
+                if (!currentSource.getType().equals(source.getType())) {
+                    return true;
+                }
+
+                if (currentSource.getType().equals(Source.Type.WEB_ARCHIVE)) {
+                    Optional<String> currentStorageObjectId = currentSource.getWebArchive().map(w -> w.getStorageObject().getId());
+                    Optional<String> storageObjectId = source.getWebArchive().map(w -> w.getStorageObject().getId());
+                    return !currentStorageObjectId.isPresent() || !storageObjectId.isPresent() || !storageObjectId.equals(currentStorageObjectId);
+                }
+
+                if (currentSource.getType().equals(Source.Type.EXTERNAL_SOURCE)) {
+                    Optional<URI> currentURI = currentSource.getURI();
+                    Optional<URI> nextURI = source.getURI();
+                    return !currentURI.isPresent() || !nextURI.isPresent() || !currentURI.equals(nextURI);
+                }
+
+                return true;
+            }).orElse(true);
+
             if (shouldLoadSource) {
-                Log.i("handleViewTargetForAnnotation", "source: " + source.getType().toString());
-                source.getWebArchive().ifPresent((w) -> {
-                    Log.i("handleViewTargetForAnnotation", w.getStorageObject().getAmazonS3URI(getContext(), authenticationViewModel.getUser().getValue()).toString());
-                });
                 sourceWebViewViewModel.reset();
                 webView.setSource(source);
             }
@@ -757,9 +772,10 @@ public class SourceWebView extends Fragment {
                             .stream()
                             .noneMatch(committedAnnotation -> committedAnnotation.getId().equals(annotation.getId()));
             if (shouldAddAnnotation) {
-                sourceWebViewViewModel.addAnnotation(annotation);
+                sourceWebViewViewModel.addAnnotation(annotation, true);
+            } else {
+                sourceWebViewViewModel.setFocusedAnnotationId(annotation.getId());
             }
-            sourceWebViewViewModel.setFocusedAnnotationId(annotation.getId());
         });
 
         return optionalSource;
@@ -784,7 +800,6 @@ public class SourceWebView extends Fragment {
     }
 
     private void handleRenderAnnotations(ArrayList<Annotation> annotations, String focusedAnnotationId) {
-        Log.i("handleRenderAnnotations", "handleRenderAnotations");
         if (!Optional.ofNullable(sourceWebViewViewModel.getSourceHasFinishedInitializing()).map(LiveData::getValue).orElse(false)) {
             ErrorRepository.captureWarning(new Exception("handleRenderAnnotations: expected webview to be initialized, nooping."));
             return;

@@ -189,7 +189,7 @@ public class AnnotationService extends Service {
                 future = CompletableFuture.completedFuture(webArchive.getStorageObject().getAmazonS3URI(context, user));
             } else {
                 future = webArchive.compile(context, user)
-                        .thenCompose(_result -> webArchive.getStorageObject().upload(context, user, handleUploadProgress));
+                        .thenCompose(compiledWebArchive -> compiledWebArchive.getStorageObject().upload(context, user, handleUploadProgress));
             }
 
             return future.thenApply((storageObjectURI) -> new Pair<>(annotationId, storageObjectURI));

@@ -84,7 +84,7 @@ public class SourceWebViewViewModel extends ViewModel {
     }
 
     public void setSourceHasFinishedInitializing(boolean sourceHasFinishedInitializing) {
-        Log.d("setSourceHasFinishedInitializing", "sourceHasFinishedInitializing: " + sourceHasFinishedInitializing, new Exception("trace"));
+        Log.d("SourceWebViewModel", "setSourceHasFinishedInitializing: " + sourceHasFinishedInitializing, new Exception());
         this.sourceHasFinishedInitializing.setValue(sourceHasFinishedInitializing);
     }
 
@@ -181,10 +181,13 @@ public class SourceWebViewViewModel extends ViewModel {
         newAnnotationIds.add(annotation.getId());
     }
 
-    public void addAnnotation(Annotation annotation) {
+    public void addAnnotation(Annotation annotation, boolean focusAnnotation) {
         ArrayList<Annotation> newAnnotations = (ArrayList<Annotation>) annotations.getValue().clone();
         newAnnotations.add(annotation);
         annotations.setValue(newAnnotations);
+        if (focusAnnotation) {
+            focusedAnnotationId.setValue(annotation.getId());
+        }
     }
 
     public boolean updateAnnotation(Annotation annotation) {

@@ -1,9 +1,14 @@
 package io.literal.repository;
 
 import android.content.Context;
+import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 
+import org.apache.james.mime4j.codec.DecodeMonitor;
+import org.apache.james.mime4j.dom.field.ContentLocationField;
+import org.apache.james.mime4j.dom.field.FieldName;
+import org.apache.james.mime4j.field.ContentLocationFieldImpl;
 import org.apache.james.mime4j.message.BodyPart;
 import org.apache.james.mime4j.message.BodyPartBuilder;
 import org.apache.james.mime4j.message.SingleBodyBuilder;
@@ -77,6 +82,11 @@ public class WebArchiveRepository {
                 return "base64";
             }).orElse("quoted-printable");
 
+            Log.i("createBodyPart", "url: " + webResourceRequest.getUrl().toString().trim());
+
+            RawField rawField = new RawField(FieldName.CONTENT_LOCATION, webResourceRequest.getUrl().toString());
+            ContentLocationField contentLocationField = ContentLocationFieldImpl.PARSER.parse(rawField, DecodeMonitor.SILENT);
+
             return Optional.of(
                     BodyPartBuilder.create()
                             .setBody(
@@ -87,7 +97,7 @@ public class WebArchiveRepository {
                             )
                             .setContentType(contentType)
                             .setContentTransferEncoding(contentTransferEncoding)
-                            .setField(new RawField("Content-Location", webResourceRequest.getUrl().toString()))
+                            .setField(contentLocationField)
                             .build()
             );
         } catch (Exception e) {
