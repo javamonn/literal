@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.IBinder;
+import android.util.Log;
 import android.util.Pair;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -167,8 +168,6 @@ public class AnnotationService extends Service {
             CreateAnnotationIntent intent,
             Function1<Integer, Void> onUploadProgress
     ) {
-
-        ArrayList<Function1<Callback<Exception, StorageObject>, TransferObserver>> uploadThunks = new ArrayList<>();
         HashMap<Integer, Pair<Long, Long>> uploadProgressById = new HashMap<>();
         Function3<Integer, Long, Long, Void> handleUploadProgress = (id, bytesCurrent, bytesTotal) -> {
             uploadProgressById.put(id, new Pair<>(bytesCurrent, bytesTotal));

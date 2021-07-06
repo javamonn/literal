@@ -86,14 +86,15 @@ public class StorageObject implements Parcelable {
 
     protected StorageObject(Parcel in) {
         Bundle input = new Bundle();
+        input.setClassLoader(StorageObject.class.getClassLoader());
         input.readFromParcel(in);
 
         this.id = input.getString(KEY_ID);
         this.type = (Type) input.getSerializable(KEY_TYPE);
         this.status = (Status) input.getSerializable(KEY_STATUS);
         this.file = new File(input.getString(KEY_FILE));
-        this.uri = new AmazonS3URI(input.getString(KEY_URI));
         this.contentType = (Format) input.getSerializable(KEY_CONTENT_TYPE);
+        this.uri = Optional.ofNullable(input.getString(KEY_URI)).map(AmazonS3URI::new).orElse(null);
 
     }
 
@@ -121,8 +122,11 @@ public class StorageObject implements Parcelable {
         output.putSerializable(KEY_TYPE, type);
         output.putSerializable(KEY_STATUS, status);
         output.putString(KEY_FILE, file.getAbsolutePath());
-        output.putString(KEY_URI, uri.toString());
         output.putSerializable(KEY_CONTENT_TYPE, contentType);
+        if (uri != null) {
+            output.putString(KEY_URI, uri.toString());
+        }
+
         output.writeToParcel(dest, flags);
     }
 
@@ -195,13 +199,6 @@ public class StorageObject implements Parcelable {
         }
 
         return Optional.ofNullable(inst);
-    }
-
-    public void ensureDownloadRequired(Context context) {
-        if (status.equals(Status.DOWNLOAD_REQUIRED) && getFile(context).exists()) {
-            setStatus(Status.SYNCHRONIZED);
-        }
-        setStatus(Status.DOWNLOAD_REQUIRED);
     }
 
     private static Pair<Type, String> parsePath(String path) {
@@ -375,7 +372,6 @@ public class StorageObject implements Parcelable {
     }
 
     public CompletableFuture<Void> download(Context context, User user) {
-        ensureDownloadRequired(context);
         if (status.equals(Status.UPLOAD_REQUIRED) || status.equals(Status.SYNCHRONIZED)) {
             return CompletableFuture.completedFuture(null);
         }
@@ -386,8 +382,14 @@ public class StorageObject implements Parcelable {
             return future;
         }
 
+        File file = getFile(context);
+        if (file.exists()) {
+            setStatus(Status.SYNCHRONIZED);
+            return CompletableFuture.completedFuture(null);
+        }
+
         AmazonS3URI uri = getAmazonS3URI(context, user);
-        return StorageRepository.download(context, uri.getKey(), getFile(context))
+        return StorageRepository.download(context, uri.getKey(), file)
                 .whenComplete((_void, e) -> {
                     if (e == null) {
                         setStatus(Status.SYNCHRONIZED);

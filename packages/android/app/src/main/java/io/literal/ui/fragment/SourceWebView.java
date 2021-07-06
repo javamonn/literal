@@ -34,6 +34,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -189,6 +190,7 @@ public class SourceWebView extends Fragment {
                                             sourceWebViewViewModel.getAnnotations().getValue().toArray(new Annotation[0]),
                                             sourceWebViewViewModel.getFocusedAnnotationId().getValue()
                                     );
+                                    Log.i("onInjectAnnotationRendererScript", "onInjectAnnotationRendererScript");
                                     return WebViewRepository.evaluateJavascript(webview, script).thenApply(_result -> ((Void) null));
                                 })
                                 .orElseGet(() -> {
@@ -197,16 +199,29 @@ public class SourceWebView extends Fragment {
                                    return future;
                                 })));
         webView.setOnSourceChanged((source) -> {
-            toolbar.setTitle(source.getDisplayURI().getHost());
             sourceWebViewViewModel.setSourceHasFinishedInitializing(false);
+            toolbar.setTitle(source.getDisplayURI().getHost());
 
             Optional<Activity> activity = Optional.ofNullable(getActivity());
             Optional<Bitmap> favicon = source.getFavicon();
+
             if (activity.isPresent() && favicon.isPresent()) {
                 toolbar.setLogo(
-                    new BitmapDrawable(
+                        new BitmapDrawable(
                                 activity.get().getResources(),
                                 BitmapRepository.scaleAndAddBackground(getContext(), favicon.get())
+                        )
+                );
+            }
+            return null;
+        });
+        webView.setOnReceivedIcon((icon) -> {
+            Optional<Activity> activity = Optional.ofNullable(getActivity());
+            if (activity.isPresent() && Optional.ofNullable(icon).isPresent()) {
+                toolbar.setLogo(
+                        new BitmapDrawable(
+                                activity.get().getResources(),
+                                BitmapRepository.scaleAndAddBackground(getContext(), icon)
                         )
                 );
             }
@@ -329,8 +344,12 @@ public class SourceWebView extends Fragment {
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
-        } else {
-            webView.loadUrl(paramInitialUrl);
+        }
+
+        try {
+            webView.setSource(new Source(new URI(paramInitialUrl)));
+        } catch (Exception e) {
+            ErrorRepository.captureException(e);
         }
     }
 
@@ -408,27 +427,6 @@ public class SourceWebView extends Fragment {
                             sourceWebViewViewModel.setFocusedAnnotationId(annotation.getId());
                             bottomSheetAppWebViewViewModel.setBottomSheetState(BottomSheetBehavior.STATE_EXPANDED);
                         }));
-
-                        /**
-                        TimeState timeState = new TimeState(
-                                new WebArchive[]{webArchive},
-                                new String[]{DateUtil.toISO8601UTC(new Date())}
-                        );
-
-                        Target[] target = annotation.getTarget();
-                        for (int i = 0; i < target.length; i++) {
-                            if (target[i].getType().equals(Target.Type.SPECIFIC_TARGET)) {
-                                SpecificTarget specificTarget = (SpecificTarget) target[i];
-                                target[i] = new SpecificTarget(
-                                        specificTarget.getId(),
-                                        specificTarget.getSource(),
-                                        specificTarget.getSelector(),
-                                        new State[]{timeState}
-                                );
-                                break;
-                            }
-                        }
-                         **/
                     } catch (Exception e) {
                         ErrorRepository.captureException(e);
                         Optional.ofNullable(getActivity()).ifPresent(activity -> ToastRepository.show(activity, R.string.toast_error_annotation_created));
@@ -786,6 +784,7 @@ public class SourceWebView extends Fragment {
     }
 
     private void handleRenderAnnotations(ArrayList<Annotation> annotations, String focusedAnnotationId) {
+        Log.i("handleRenderAnnotations", "handleRenderAnotations");
         if (!Optional.ofNullable(sourceWebViewViewModel.getSourceHasFinishedInitializing()).map(LiveData::getValue).orElse(false)) {
             ErrorRepository.captureWarning(new Exception("handleRenderAnnotations: expected webview to be initialized, nooping."));
             return;

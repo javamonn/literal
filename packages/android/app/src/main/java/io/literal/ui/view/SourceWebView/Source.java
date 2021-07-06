@@ -44,6 +44,7 @@ public class Source {
         this.webArchive = Optional.of(webArchive);
         this.displayURI = displayURI;
         this.uri = Optional.empty();
+        this.favicon = Optional.empty();
         this.type = Type.WEB_ARCHIVE;
         this.pageWebResourceRequests = new ArrayList<>();
     }
@@ -52,6 +53,7 @@ public class Source {
         this.uri = Optional.of(uri);
         this.webArchive = Optional.empty();
         this.displayURI = Optional.empty();
+        this.favicon = Optional.empty();
         this.type = Type.EXTERNAL_SOURCE;
         this.pageWebResourceRequests = new ArrayList<>();
     }

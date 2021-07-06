@@ -32,6 +32,7 @@ public class SourceWebView extends MessagingWebView {
     private Optional<Client.Builder> clientBuilder;
     private Optional<Source> source;
     private Optional<Function1<Source, Void>> onSourceChanged;
+    private Optional<Function1<Bitmap, Void>> onReceivedIcon;
 
     private WebChromeClient webChromeClient = new WebChromeClient() {
         @Override
@@ -39,7 +40,7 @@ public class SourceWebView extends MessagingWebView {
             super.onReceivedIcon(view, icon);
             source.ifPresent(s -> {
                 s.setFavicon(Optional.ofNullable(icon));
-                onSourceChanged.ifPresent(cb -> cb.invoke(s));
+                onReceivedIcon.ifPresent(cb -> cb.invoke(icon));
             });
         }
     };
@@ -92,7 +93,9 @@ public class SourceWebView extends MessagingWebView {
             return;
         }
 
-        this.loadUrl(sourceURI.get().toString());
+        if (!Optional.ofNullable(getUrl()).map(u -> u.equals(sourceURI.get().toString())).orElse(false)) {
+            this.loadUrl(sourceURI.get().toString());
+        }
     }
 
 
@@ -195,5 +198,9 @@ public class SourceWebView extends MessagingWebView {
 
     public Optional<Client.Builder> getClientBuilder() {
         return this.clientBuilder;
+    }
+
+    public void setOnReceivedIcon(Function1<Bitmap, Void> onReceivedIcon) {
+        this.onReceivedIcon = Optional.of(onReceivedIcon);
     }
 }

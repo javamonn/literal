@@ -1,5 +1,7 @@
 package io.literal.viewmodel;
 
+import android.util.Log;
+
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
@@ -82,6 +84,7 @@ public class SourceWebViewViewModel extends ViewModel {
     }
 
     public void setSourceHasFinishedInitializing(boolean sourceHasFinishedInitializing) {
+        Log.d("setSourceHasFinishedInitializing", "sourceHasFinishedInitializing: " + sourceHasFinishedInitializing, new Exception("trace"));
         this.sourceHasFinishedInitializing.setValue(sourceHasFinishedInitializing);
     }
 

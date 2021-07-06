@@ -1,5 +1,7 @@
 package io.literal.model;
 
+import android.util.Log;
+
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -146,8 +148,8 @@ public class Annotation {
         );
     }
 
-    public Annotation updateTarget(Target target) {
-        Function1<Target, String> getIDForTarget = (annotation) -> {
+    public Annotation updateTarget(Target updatedTarget) {
+        Function1<Target, String> getIDForTarget = (target) -> {
             if (target instanceof ExternalTarget) {
                 return ((ExternalTarget) target).getId().toString();
             } else if (target instanceof SpecificTarget) {
@@ -159,8 +161,8 @@ public class Annotation {
 
         Target[] newTarget = getTarget().clone();
         for (int i = 0; i < getTarget().length; i++) {
-            if (getIDForTarget.invoke(getTarget()[i]).equals(getIDForTarget.invoke(target))) {
-                newTarget[i] = target;
+            if (getIDForTarget.invoke(newTarget[i]).equals(getIDForTarget.invoke(updatedTarget))) {
+                newTarget[i] = updatedTarget;
                 break;
             }
         }
@@ -177,8 +179,8 @@ public class Annotation {
         private String id;
 
         public Builder(Annotation base) {
-            this.body = base.getBody();
-            this.target = base.getTarget();
+            this.body = base.getBody().clone();
+            this.target = base.getTarget().clone();
             this.motivation = base.getMotivation();
             this.created = base.getCreated();
             this.id = base.getId();

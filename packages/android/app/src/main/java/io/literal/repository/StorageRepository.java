@@ -2,6 +2,7 @@ package io.literal.repository;
 
 import android.content.Context;
 import android.net.Uri;
+import android.util.Log;
 
 import com.amazonaws.mobile.client.AWSMobileClient;
 import com.amazonaws.mobileconnectors.s3.transferutility.TransferListener;

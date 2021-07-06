@@ -50,7 +50,10 @@ public class WebArchiveRepository {
         );
 
         return WebViewRepository.saveWebArchive(webView, archive.getFile(context).toURI().getPath(), false)
-                .thenApply(_archive -> new WebArchive(archive, webResourceRequests, scriptElements));
+                .thenApply(_archive -> {
+                    archive.setStatus(StorageObject.Status.UPLOAD_REQUIRED);
+                    return new WebArchive(archive, webResourceRequests, scriptElements);
+                });
     }
 
     public static StorageObject createArchiveStorageObject() {

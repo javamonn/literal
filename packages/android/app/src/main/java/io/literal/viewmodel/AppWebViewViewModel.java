@@ -12,7 +12,6 @@ import io.literal.lib.WebEvent;
 public class AppWebViewViewModel extends ViewModel {
     private final MutableLiveData<Boolean> hasFinishedInitializing = new MutableLiveData<>(false);
     private final MutableLiveData<Integer> bottomSheetState = new MutableLiveData<>(null);
-    private final MutableLiveData<String> url = new MutableLiveData<>(null);
     private final MutableLiveData<ArrayDeque<WebEvent>> webEvents = new MutableLiveData<>(null);
     private final MutableLiveData<ArrayDeque<WebEvent>> receivedWebEvents = new MutableLiveData<>(null);
 
@@ -55,14 +54,6 @@ public class AppWebViewViewModel extends ViewModel {
     public MutableLiveData<ArrayDeque<WebEvent>> getWebEvents() { return webEvents; }
 
     public MutableLiveData<Boolean> getHasFinishedInitializing() { return hasFinishedInitializing; }
-
-    public MutableLiveData<String> getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url.setValue(url);
-    }
 
     public MutableLiveData<Integer> getBottomSheetState() {
         return bottomSheetState;

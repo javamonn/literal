@@ -254,17 +254,8 @@ public class AppWebView extends Fragment {
         appWebView.setExternalWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(android.webkit.WebView view, String url) {
-                Log.i("AppWebView", "onPageFinished");
                 if (!appWebViewViewModel.getHasFinishedInitializing().getValue()) {
                     appWebViewViewModel.setHasFinishedInitializing(true);
-                }
-            }
-
-            @Override
-            public void onPageStarted(android.webkit.WebView view, String url, Bitmap favicon) {
-                String viewModelUrl = appWebViewViewModel.getUrl().getValue();
-                if (viewModelUrl == null || !viewModelUrl.equals(url)) {
-                    appWebViewViewModel.setUrl(url);
                 }
             }
         });
@@ -352,12 +343,6 @@ public class AppWebView extends Fragment {
             }
             return null;
         });
-        appWebViewViewModel.getUrl().observe(requireActivity(), (url) -> {
-            String currentUrl = appWebView.getUrl();
-            if (currentUrl == null || (url != null && !appWebView.getUrl().equals(url))) {
-                appWebView.loadUrl(url);
-            }
-        });
 
         appWebViewViewModel.getWebEvents().observe(requireActivity(), (webEvents) -> {
             if (webEvents == null) {
@@ -373,9 +358,9 @@ public class AppWebView extends Fragment {
 
         if (savedInstanceState != null) {
             appWebView.restoreState(savedInstanceState);
-        } else {
-            appWebViewViewModel.setUrl(paramInitialUrl);
         }
+
+        appWebView.loadUrl(paramInitialUrl);
     }
 
     @Override

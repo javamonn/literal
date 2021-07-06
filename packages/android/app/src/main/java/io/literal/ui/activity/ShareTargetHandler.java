@@ -132,9 +132,9 @@ public class ShareTargetHandler extends InstrumentedActivity {
 
         sourceWebViewViewModel.getSourceHasFinishedInitializing().observe(this, hasFinishedInitializing -> {
             ViewGroup splash = findViewById(R.id.share_target_handler_splash);
-            splash.setVisibility(hasFinishedInitializing ? View.INVISIBLE : View.VISIBLE);
-
-            if (hasFinishedInitializing) {
+            Log.i("installSourceWebview", "hasFinishedInitializing: " + hasFinishedInitializing);
+            if (hasFinishedInitializing && splash.getVisibility() == View.VISIBLE) {
+                splash.setVisibility(View.INVISIBLE);
                 ToastRepository.show(this, R.string.toast_create_from_source);
             }
         });
